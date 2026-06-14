@@ -1,0 +1,147 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: #08080a;
+    color: #e5e5e7;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0d0d10;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #3e3e47;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #c9a227;
+  }
+}
+
+@layer components {
+  .gold-text {
+    background: linear-gradient(135deg, #c9a227 0%, #e5c137 50%, #a07d1c 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .card {
+    @apply bg-obsidian-900 border border-obsidian-700 rounded-xl;
+  }
+
+  .card-hover {
+    @apply card transition-all duration-200 hover:border-gold-700/50 hover:shadow-lg hover:shadow-gold-900/10;
+  }
+
+  .btn-gold {
+    @apply bg-gold-gradient text-obsidian-950 font-semibold px-4 py-2 rounded-lg
+           transition-all duration-200 hover:opacity-90 hover:shadow-lg hover:shadow-gold-900/30
+           active:scale-95 text-sm;
+  }
+
+  .btn-ghost {
+    @apply border border-obsidian-600 text-obsidian-200 px-4 py-2 rounded-lg
+           transition-all duration-200 hover:border-gold-700/50 hover:text-gold-400
+           active:scale-95 text-sm;
+  }
+
+  .btn-danger {
+    @apply border border-red-900/50 text-red-400 px-3 py-1.5 rounded-lg
+           transition-all duration-200 hover:bg-red-950/30 hover:border-red-700
+           active:scale-95 text-xs;
+  }
+
+  .input-field {
+    @apply w-full bg-obsidian-800 border border-obsidian-600 rounded-lg px-3 py-2.5
+           text-sm text-obsidian-100 placeholder-obsidian-500
+           focus:outline-none focus:border-gold-600 focus:ring-1 focus:ring-gold-600/30
+           transition-colors duration-150;
+  }
+
+  .label {
+    @apply block text-xs font-medium text-obsidian-400 mb-1.5 uppercase tracking-wider;
+  }
+
+  .badge-paid {
+    @apply inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full
+           bg-emerald-950/50 text-emerald-400 border border-emerald-900/50;
+  }
+
+  .badge-pending {
+    @apply inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full
+           bg-amber-950/50 text-amber-400 border border-amber-900/50;
+  }
+
+  .badge-low-stock {
+    @apply inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full
+           bg-red-950/50 text-red-400 border border-red-900/50;
+  }
+
+  .section-title {
+    @apply font-display text-2xl font-light tracking-wide text-obsidian-100;
+  }
+
+  .metric-card {
+    @apply card p-5 flex flex-col gap-2;
+  }
+
+  .tab-active {
+    @apply text-gold-400 border-b-2 border-gold-500;
+  }
+
+  .tab-inactive {
+    @apply text-obsidian-400 border-b-2 border-transparent hover:text-obsidian-200 hover:border-obsidian-600;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+  }
+}
+
+/* Drag and drop area */
+.drop-zone {
+  border: 2px dashed #3e3e47;
+  transition: all 0.2s ease;
+}
+.drop-zone.active {
+  border-color: #c9a227;
+  background: rgba(201, 162, 39, 0.05);
+}
+
+/* Animate in */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up {
+  animation: fadeUp 0.3s ease forwards;
+}
+
+/* Gold shimmer on logo */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.shimmer-gold {
+  background: linear-gradient(90deg, #a07d1c 0%, #e5c137 30%, #fdf3b0 50%, #e5c137 70%, #a07d1c 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 4s linear infinite;
+}

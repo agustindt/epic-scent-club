@@ -1,0 +1,157 @@
+import React, { useState } from 'react'
+import { LayoutDashboard, Package, Users, ShoppingBag, MessageCircle, AlertTriangle, Database } from 'lucide-react'
+import { useLocalStorage } from './hooks/useLocalStorage'
+import Dashboard from './components/Dashboard'
+import Inventario from './components/Inventario'
+import Clientes from './components/Clientes'
+import Ventas from './components/Ventas'
+import Seguimiento from './components/Seguimiento'
+import DataBackup from './components/DataBackup'
+
+const TABS = [
+  { id: 'dashboard',   label: 'Dashboard',   Icon: LayoutDashboard },
+  { id: 'inventario',  label: 'Inventario',  Icon: Package },
+  { id: 'clientes',    label: 'Clientes',    Icon: Users },
+  { id: 'ventas',      label: 'Ventas',      Icon: ShoppingBag },
+  { id: 'seguimiento', label: 'Seguimiento', Icon: MessageCircle },
+]
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState('dashboard')
+  const [showBackup, setShowBackup] = useState(false)
+  const [perfumes,     setPerfumes]     = useLocalStorage('esc_perfumes',     [])
+  const [clientes,     setClientes]     = useLocalStorage('esc_clientes',     [])
+  const [ventas,       setVentas]       = useLocalStorage('esc_ventas',       [])
+  const [seguimientos, setSeguimientos] = useLocalStorage('esc_seguimientos', [])
+
+  const handleImportBackup = (data) => {
+    if (data.esc_perfumes)     setPerfumes(data.esc_perfumes)
+    if (data.esc_clientes)     setClientes(data.esc_clientes)
+    if (data.esc_ventas)       setVentas(data.esc_ventas)
+    if (data.esc_seguimientos) setSeguimientos(data.esc_seguimientos)
+  }
+
+  const pendientesCount  = ventas.filter(v => v.estadoPago === 'pendiente').length
+  const lowStockCount    = perfumes.filter(p => p.stock > 0 && p.stock < 2).length
+  const alertBadgeTotal  = pendientesCount + lowStockCount
+
+  const segPendientes = seguimientos.filter(s => s.estado === 'pendiente').length
+  const segVencidos   = seguimientos.filter(s => {
+    if (s.estado !== 'pendiente' || !s.fechaRecordatorio) return false
+    const diff = Math.floor((Date.now() - new Date(s.fechaRecordatorio).getTime()) / 86400000)
+    return diff > 0
+  }).length
+
+  return (
+    <div className="min-h-screen bg-obsidian-950 flex flex-col">
+      <header className="border-b border-obsidian-800 bg-obsidian-950/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-gold-gradient flex items-center justify-center flex-shrink-0">
+                <span className="text-obsidian-950 font-bold text-xs">E</span>
+              </div>
+              <div>
+                <h1 className="shimmer-gold font-display text-lg font-light tracking-[0.15em] leading-none">
+                  EPIC SCENT CLUB
+                </h1>
+                <p className="text-obsidian-600 text-[9px] tracking-[0.3em] uppercase leading-none mt-0.5">Parfum</p>
+              </div>
+            </div>
+
+            {alertBadgeTotal > 0 && (
+              <div className="flex items-center gap-1.5 text-xs text-amber-400 bg-amber-950/30 border border-amber-900/40 rounded-full px-3 py-1">
+                <AlertTriangle size={12} />
+                <span>{alertBadgeTotal} alerta{alertBadgeTotal !== 1 ? 's' : ''}</span>
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowBackup(v => !v)}
+              className={`p-2 rounded-lg transition-colors ${showBackup ? 'text-gold-400 bg-gold-950/30' : 'text-obsidian-500 hover:text-gold-400 hover:bg-obsidian-800'}`}
+              title="Respaldo de datos"
+              aria-label="Respaldo de datos"
+            >
+              <Database size={18} />
+            </button>
+          </div>
+
+          <nav className="flex gap-1 overflow-x-auto pb-px" role="tablist" aria-label="Navegación principal">
+            {TABS.map(({ id, label, Icon }) => {
+              const isActive = activeTab === id
+              let badge = 0
+              let badgeColor = 'bg-amber-500 text-obsidian-950'
+              if (id === 'ventas')      { badge = pendientesCount }
+              if (id === 'inventario')  { badge = lowStockCount;  badgeColor = 'bg-red-600 text-white' }
+              if (id === 'seguimiento') {
+                badge = segVencidos > 0 ? segVencidos : segPendientes
+                badgeColor = segVencidos > 0 ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'
+              }
+
+              return (
+                <button
+                  key={id}
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setActiveTab(id)}
+                  className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-all duration-150
+                    ${isActive ? 'tab-active' : 'tab-inactive'}`}
+                >
+                  <Icon size={15} />
+                  {label}
+                  {badge > 0 && (
+                    <span className={`text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center ${badgeColor}`}>
+                      {badge}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </nav>
+        </div>
+      </header>
+
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8">
+        {showBackup && (
+          <div className="mb-6">
+            <DataBackup onImport={handleImportBackup} onClose={() => setShowBackup(false)} />
+          </div>
+        )}
+
+        {activeTab === 'dashboard' && (
+          <Dashboard perfumes={perfumes} ventas={ventas} clientes={clientes} />
+        )}
+        {activeTab === 'inventario' && (
+          <Inventario perfumes={perfumes} setPerfumes={setPerfumes} />
+        )}
+        {activeTab === 'clientes' && (
+          <Clientes
+            clientes={clientes} setClientes={setClientes}
+            ventas={ventas} setVentas={setVentas}
+          />
+        )}
+        {activeTab === 'ventas' && (
+          <Ventas
+            ventas={ventas} setVentas={setVentas}
+            perfumes={perfumes} setPerfumes={setPerfumes}
+            clientes={clientes}
+          />
+        )}
+        {activeTab === 'seguimiento' && (
+          <Seguimiento
+            clientes={clientes}
+            ventas={ventas}
+            seguimientos={seguimientos}
+            setSeguimientos={setSeguimientos}
+          />
+        )}
+      </main>
+
+      <footer className="border-t border-obsidian-900 py-4">
+        <p className="text-center text-xs text-obsidian-700 tracking-wider">
+          EPIC SCENT CLUB PARFUM · Sistema de Gestión
+        </p>
+      </footer>
+    </div>
+  )
+}
