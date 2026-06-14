@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
-import { Plus, X, Check, Trash2, User, Phone, ShoppingBag, ChevronDown, ChevronUp, Edit3 } from 'lucide-react'
-import { generateId, formatCurrency, formatDate } from '../utils/helpers'
+import { Plus, X, Check, Trash2, User, ChevronDown, ChevronUp, Edit3, RefreshCw, Cloud, CloudOff } from 'lucide-react'
+import { formatCurrency, formatDate } from '../utils/helpers'
 
 const EMPTY_FORM = { nombre: '', telefono: '' }
 
-function ClienteForm({ initial = EMPTY_FORM, onSave, onCancel, title = 'Nuevo Cliente' }) {
+function ClienteForm({ initial = EMPTY_FORM, onSave, onCancel, title = 'Nuevo Cliente', saving = false }) {
   const [form, setForm] = useState(initial)
   const set = (f, v) => setForm(p => ({ ...p, [f]: v }))
 
@@ -14,22 +14,24 @@ function ClienteForm({ initial = EMPTY_FORM, onSave, onCancel, title = 'Nuevo Cl
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
           <label className="label">Nombre *</label>
-          <input className="input-field" placeholder="Nombre completo" value={form.nombre} onChange={e => set('nombre', e.target.value)} required />
+          <input className="input-field" placeholder="Nombre completo" value={form.nombre} onChange={e => set('nombre', e.target.value)} required disabled={saving} />
         </div>
         <div>
           <label className="label">Teléfono</label>
-          <input className="input-field" placeholder="+54 9 351 000-0000" value={form.telefono} onChange={e => set('telefono', e.target.value)} />
+          <input className="input-field" placeholder="+54 9 351 000-0000" value={form.telefono} onChange={e => set('telefono', e.target.value)} disabled={saving} />
         </div>
       </div>
       <div className="flex gap-3">
-        <button type="submit" className="btn-gold flex items-center gap-2"><Check size={15} /> Guardar</button>
-        {onCancel && <button type="button" className="btn-ghost flex items-center gap-2" onClick={onCancel}><X size={15} /> Cancelar</button>}
+        <button type="submit" className="btn-gold flex items-center gap-2" disabled={saving}>
+          <Check size={15} /> {saving ? 'Guardando…' : 'Guardar'}
+        </button>
+        {onCancel && <button type="button" className="btn-ghost flex items-center gap-2" onClick={onCancel} disabled={saving}><X size={15} /> Cancelar</button>}
       </div>
     </form>
   )
 }
 
-function ClienteCard({ cliente, ventas, onEdit, onDelete, onTogglePago }) {
+function ClienteCard({ cliente, ventas, onEdit, onDelete, onTogglePago, saving }) {
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
 
@@ -44,8 +46,9 @@ function ClienteCard({ cliente, ventas, onEdit, onDelete, onTogglePago }) {
         <ClienteForm
           title="Editar Cliente"
           initial={{ nombre: cliente.nombre, telefono: cliente.telefono || '' }}
-          onSave={(data) => { onEdit(cliente.id, data); setEditing(false) }}
+          onSave={async (data) => { await onEdit(cliente.id, data); setEditing(false) }}
           onCancel={() => setEditing(false)}
+          saving={saving}
         />
       </div>
     )
@@ -79,7 +82,6 @@ function ClienteCard({ cliente, ventas, onEdit, onDelete, onTogglePago }) {
 
       {expanded && (
         <div className="border-t border-obsidian-800 px-4 py-3 bg-obsidian-950/30 fade-up">
-          {/* Stats */}
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
               <p className="text-xs text-obsidian-500 mb-0.5">Total comprado</p>
@@ -97,7 +99,6 @@ function ClienteCard({ cliente, ventas, onEdit, onDelete, onTogglePago }) {
             </div>
           </div>
 
-          {/* Historial */}
           {clienteVentas.length > 0 && (
             <div className="mb-4">
               <p className="text-xs text-obsidian-500 uppercase tracking-wider mb-2">Historial</p>
@@ -125,10 +126,10 @@ function ClienteCard({ cliente, ventas, onEdit, onDelete, onTogglePago }) {
           )}
 
           <div className="flex gap-2">
-            <button className="btn-ghost flex items-center gap-1.5 text-xs py-1.5" onClick={e => { e.stopPropagation(); setEditing(true) }}>
+            <button className="btn-ghost flex items-center gap-1.5 text-xs py-1.5" onClick={e => { e.stopPropagation(); setEditing(true) }} disabled={saving}>
               <Edit3 size={12} /> Editar
             </button>
-            <button className="btn-danger flex items-center gap-1.5" onClick={e => { e.stopPropagation(); onDelete(cliente.id) }}>
+            <button className="btn-danger flex items-center gap-1.5" onClick={e => { e.stopPropagation(); onDelete(cliente.id) }} disabled={saving}>
               <Trash2 size={12} /> Eliminar
             </button>
           </div>
@@ -138,22 +139,52 @@ function ClienteCard({ cliente, ventas, onEdit, onDelete, onTogglePago }) {
   )
 }
 
-export default function Clientes({ clientes, setClientes, ventas, setVentas }) {
+export default function Clientes({
+  clientes, loading, error, syncing, reload,
+  addCliente, editCliente, removeCliente,
+  ventas, setVentas,
+}) {
   const [showForm, setShowForm] = useState(false)
   const [search, setSearch] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [actionError, setActionError] = useState(null)
 
-  const handleAdd = (data) => {
-    setClientes(prev => [...prev, { id: generateId(), ...data }])
-    setShowForm(false)
+  const handleAdd = async (data) => {
+    setSaving(true)
+    setActionError(null)
+    try {
+      await addCliente(data)
+      setShowForm(false)
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleEdit = (id, data) => {
-    setClientes(prev => prev.map(c => c.id === id ? { ...c, ...data } : c))
+  const handleEdit = async (id, data) => {
+    setSaving(true)
+    setActionError(null)
+    try {
+      await editCliente(id, data)
+    } catch (err) {
+      setActionError(err.message)
+      throw err
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleDelete = (id) => {
-    if (confirm('¿Eliminar este cliente? Sus ventas se conservarán.')) {
-      setClientes(prev => prev.filter(c => c.id !== id))
+  const handleDelete = async (id) => {
+    if (!confirm('¿Eliminar este cliente? Sus ventas se conservarán.')) return
+    setSaving(true)
+    setActionError(null)
+    try {
+      await removeCliente(id)
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -174,17 +205,46 @@ export default function Clientes({ clientes, setClientes, ventas, setVentas }) {
     <div className="space-y-6 fade-up">
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex-1">
-          <h2 className="section-title">Clientes</h2>
-          <p className="text-sm text-obsidian-500 mt-0.5">{clientes.length} registrado{clientes.length !== 1 ? 's' : ''}</p>
+          <div className="flex items-center gap-3">
+            <h2 className="section-title">Clientes</h2>
+            {!error && !loading && (
+              <span className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-950/30 border border-emerald-900/40 rounded-full px-2 py-0.5">
+                <Cloud size={11} /> Railway
+              </span>
+            )}
+            {error && (
+              <span className="flex items-center gap-1 text-xs text-amber-400 bg-amber-950/30 border border-amber-900/40 rounded-full px-2 py-0.5">
+                <CloudOff size={11} /> Offline
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-obsidian-500 mt-0.5">
+            {loading ? 'Cargando…' : `${clientes.length} registrado${clientes.length !== 1 ? 's' : ''}`}
+            {syncing && ' · Migrando datos locales…'}
+          </p>
         </div>
-        <button className="btn-gold flex items-center gap-2" onClick={() => setShowForm(v => !v)}>
-          <Plus size={15} /> Nuevo Cliente
-        </button>
+        <div className="flex gap-2">
+          {error && (
+            <button className="btn-ghost flex items-center gap-2" onClick={reload}>
+              <RefreshCw size={15} /> Reintentar
+            </button>
+          )}
+          <button className="btn-gold flex items-center gap-2" onClick={() => setShowForm(v => !v)} disabled={loading}>
+            <Plus size={15} /> Nuevo Cliente
+          </button>
+        </div>
       </div>
+
+      {(error || actionError) && (
+        <div className="flex items-center gap-2 text-sm text-amber-400 bg-amber-950/20 border border-amber-900/30 rounded-lg px-4 py-3">
+          <CloudOff size={15} />
+          <span>{actionError || error}</span>
+        </div>
+      )}
 
       {showForm && (
         <div className="card p-5 fade-up">
-          <ClienteForm onSave={handleAdd} onCancel={() => setShowForm(false)} />
+          <ClienteForm onSave={handleAdd} onCancel={() => setShowForm(false)} saving={saving} />
         </div>
       )}
 
@@ -197,7 +257,12 @@ export default function Clientes({ clientes, setClientes, ventas, setVentas }) {
         />
       )}
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="card p-12 text-center">
+          <RefreshCw size={32} className="mx-auto mb-4 text-obsidian-600 animate-spin" />
+          <p className="text-obsidian-400 text-sm">Conectando con el servidor…</p>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="card p-12 text-center">
           <User size={40} className="mx-auto mb-4 text-obsidian-700" />
           <p className="text-obsidian-400 font-display text-xl font-light">
@@ -217,6 +282,7 @@ export default function Clientes({ clientes, setClientes, ventas, setVentas }) {
               onEdit={handleEdit}
               onDelete={handleDelete}
               onTogglePago={handleTogglePago}
+              saving={saving}
             />
           ))}
         </div>

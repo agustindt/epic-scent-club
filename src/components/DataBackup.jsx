@@ -8,13 +8,17 @@ const STORAGE_KEYS = [
   'esc_seguimientos',
 ]
 
-export default function DataBackup({ onImport, onClose }) {
+export default function DataBackup({ onImport, onClose, clientes = [] }) {
   const fileRef = useRef()
   const [status, setStatus] = useState(null)
 
   const handleExport = () => {
     const data = {}
     STORAGE_KEYS.forEach(key => {
+      if (key === 'esc_clientes') {
+        data[key] = clientes
+        return
+      }
       try {
         const raw = localStorage.getItem(key)
         data[key] = raw ? JSON.parse(raw) : []

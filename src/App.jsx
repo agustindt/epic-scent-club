@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import { LayoutDashboard, Package, Users, ShoppingBag, MessageCircle, AlertTriangle, Database } from 'lucide-react'
 import { useLocalStorage } from './hooks/useLocalStorage'
+import { useClientes } from './hooks/useClientes'
+import { bulkCreateClientes } from './api/clientes'
 import Dashboard from './components/Dashboard'
 import Inventario from './components/Inventario'
 import Clientes from './components/Clientes'
@@ -20,15 +22,26 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [showBackup, setShowBackup] = useState(false)
   const [perfumes,     setPerfumes]     = useLocalStorage('esc_perfumes',     [])
-  const [clientes,     setClientes]     = useLocalStorage('esc_clientes',     [])
+  const {
+    clientes,
+    loading: clientesLoading,
+    error: clientesError,
+    syncing: clientesSyncing,
+    reload: reloadClientes,
+    addCliente,
+    editCliente,
+    removeCliente,
+  } = useClientes()
   const [ventas,       setVentas]       = useLocalStorage('esc_ventas',       [])
   const [seguimientos, setSeguimientos] = useLocalStorage('esc_seguimientos', [])
 
   const handleImportBackup = (data) => {
     if (data.esc_perfumes)     setPerfumes(data.esc_perfumes)
-    if (data.esc_clientes)     setClientes(data.esc_clientes)
     if (data.esc_ventas)       setVentas(data.esc_ventas)
     if (data.esc_seguimientos) setSeguimientos(data.esc_seguimientos)
+    if (data.esc_clientes?.length) {
+      bulkCreateClientes(data.esc_clientes).then(() => reloadClientes()).catch(() => {})
+    }
   }
 
   const pendientesCount  = ventas.filter(v => v.estadoPago === 'pendiente').length
@@ -114,7 +127,7 @@ export default function App() {
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8">
         {showBackup && (
           <div className="mb-6">
-            <DataBackup onImport={handleImportBackup} onClose={() => setShowBackup(false)} />
+            <DataBackup onImport={handleImportBackup} onClose={() => setShowBackup(false)} clientes={clientes} />
           </div>
         )}
 
@@ -126,8 +139,16 @@ export default function App() {
         )}
         {activeTab === 'clientes' && (
           <Clientes
-            clientes={clientes} setClientes={setClientes}
-            ventas={ventas} setVentas={setVentas}
+            clientes={clientes}
+            loading={clientesLoading}
+            error={clientesError}
+            syncing={clientesSyncing}
+            reload={reloadClientes}
+            addCliente={addCliente}
+            editCliente={editCliente}
+            removeCliente={removeCliente}
+            ventas={ventas}
+            setVentas={setVentas}
           />
         )}
         {activeTab === 'ventas' && (

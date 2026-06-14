@@ -1,114 +1,62 @@
-# Epic Scent Club Parfum — Sistema de Gestión
+# Epic Scent Club Parfum
 
-App de gestión premium para tu negocio de perfumes. Control total de inventario, clientes, ventas, seguimiento WhatsApp y finanzas, todo desde el navegador con datos persistentes en LocalStorage.
+Sistema de gestión premium para perfumes con **PWA**, frontend en Vercel y **backend de clientes en Railway + PostgreSQL**.
 
-## Stack
+## Arquitectura
 
-- **React 18** + **Vite 5** — SPA ultrarrápida
-- **Tailwind CSS 3** — Diseño oscuro/dorado premium
-- **LocalStorage** — Persistencia sin backend, funciona offline
-- **Vercel** + **Railway** — Deploy en producción
+| Capa | Tecnología | Deploy |
+|------|-----------|--------|
+| Frontend (PWA) | React + Vite + vite-plugin-pwa | Vercel |
+| API Clientes | Express + PostgreSQL | Railway |
+| Inventario, ventas, seguimiento | LocalStorage | Navegador |
 
----
-
-## Instalación y desarrollo local
+## Desarrollo local
 
 ```bash
 npm install
-npm run dev
-# → http://localhost:5173
+
+# Terminal 1 — API (requiere DATABASE_URL)
+cp .env.example .env
+npm run dev:api
+
+# Terminal 2 — Frontend
+VITE_API_URL=http://localhost:3001 npm run dev
 ```
 
-## Build para producción
+## Variables de entorno
 
-```bash
-npm run build
-npm run preview   # preview local del build
+### Frontend (Vercel)
+```
+VITE_API_URL=https://tu-api.up.railway.app
 ```
 
----
-
-## Deploy en Vercel (recomendado)
-
-1. Conectá el repositorio en [vercel.com](https://vercel.com) → **New Project**.
-2. Vercel detecta Vite automáticamente → **Deploy**.
-3. La app queda online en `https://tu-proyecto.vercel.app`.
-
-O desde CLI:
-
-```bash
-vercel --prod
+### Backend (Railway)
+```
+DATABASE_URL=postgresql://...
+CORS_ORIGINS=http://localhost:5173,https://epic-scent-club.vercel.app
+PORT=3001
 ```
 
-## Deploy en Railway
+## API — Clientes
 
-1. Conectá el repo de GitHub en [railway.app](https://railway.app).
-2. Railway usa `railway.toml`: build con `npm run build`, serve con `npm start`.
-3. Generá un dominio público desde el panel del servicio.
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/health` | Health check |
+| GET | `/api/clientes` | Listar clientes |
+| POST | `/api/clientes` | Crear cliente |
+| POST | `/api/clientes/bulk` | Importar en lote |
+| PUT | `/api/clientes/:id` | Actualizar |
+| DELETE | `/api/clientes/:id` | Eliminar |
 
----
+## PWA
 
-## Respaldo de datos
+La app es instalable en móvil y desktop. Incluye service worker para cachear assets estáticos y funcionar offline (excepto operaciones de clientes que requieren API).
 
-Los datos viven en el navegador (LocalStorage). Usá el botón **Respaldo** (ícono de base de datos) en el header para:
+## Deploy
 
-- **Exportar** un archivo JSON con inventario, clientes, ventas y seguimientos
-- **Importar** un respaldo previo para restaurar o migrar entre dispositivos
+- **Vercel**: importar repo, setear `VITE_API_URL`, deploy automático
+- **Railway**: conectar repo, agregar Postgres, setear `DATABASE_URL` y `CORS_ORIGINS`, start: `npm start`
 
----
+## Migración automática
 
-## Estructura del proyecto
-
-```
-epic-scent-club/
-├── public/
-│   └── favicon.svg
-├── src/
-│   ├── components/
-│   │   ├── Dashboard.jsx
-│   │   ├── Inventario.jsx
-│   │   ├── Clientes.jsx
-│   │   ├── Ventas.jsx
-│   │   ├── Seguimiento.jsx
-│   │   └── DataBackup.jsx
-│   ├── hooks/
-│   │   └── useLocalStorage.js
-│   ├── utils/
-│   │   └── helpers.js
-│   ├── App.jsx
-│   ├── main.jsx
-│   └── index.css
-├── .github/workflows/ci.yml
-├── railway.toml
-├── vercel.json
-└── package.json
-```
-
----
-
-## Módulos
-
-### Dashboard
-Capital invertido, ventas totales, ganancia neta, cuentas por cobrar, actividad reciente y alertas de stock.
-
-### Inventario
-Alta manual, carga masiva (CSV/txt), alertas de stock bajo, edición y eliminación.
-
-### Clientes
-CRM con historial de compras, estado de cuenta y toggle de pago.
-
-### Ventas
-Registro rápido, descuento automático de stock, filtros por estado.
-
-### Seguimiento WhatsApp
-Plantillas de mensajes, recordatorios, prioridades y envío directo por WhatsApp.
-
----
-
-## Formato de carga masiva
-
-```
-Nombre, Stock, CostoBase, Comision, %Ganancia
-Sauvage Dior 100ml, 5, 12000, 500, 30
-Bleu de Chanel 50ml, 3, 9500, 400, 25
-```
+Al primer acceso, si hay clientes en LocalStorage y la API está vacía, se migran automáticamente a Railway.
