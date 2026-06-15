@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { Plus, X, Check, Trash2, User, ChevronDown, ChevronUp, Edit3, RefreshCw, Cloud, CloudOff } from 'lucide-react'
+import { Plus, X, Check, Trash2, User, ChevronDown, ChevronUp, Edit3, RefreshCw } from 'lucide-react'
 import { formatCurrency, formatDate } from '../utils/helpers'
+import { SyncStatus, LoadingCard, ErrorBanner } from './SyncStatus'
 
 const EMPTY_FORM = { nombre: '', telefono: '' }
 
@@ -142,7 +143,7 @@ function ClienteCard({ cliente, ventas, onEdit, onDelete, onTogglePago, saving }
 export default function Clientes({
   clientes, loading, error, syncing, reload,
   addCliente, editCliente, removeCliente,
-  ventas, setVentas,
+  ventas, togglePago,
 }) {
   const [showForm, setShowForm] = useState(false)
   const [search, setSearch] = useState('')
@@ -188,12 +189,13 @@ export default function Clientes({
     }
   }
 
-  const handleTogglePago = (ventaId) => {
-    setVentas(prev => prev.map(v =>
-      v.id === ventaId
-        ? { ...v, estadoPago: v.estadoPago === 'pagado' ? 'pendiente' : 'pagado' }
-        : v
-    ))
+  const handleTogglePago = async (ventaId) => {
+    setActionError(null)
+    try {
+      await togglePago(ventaId)
+    } catch (err) {
+      setActionError(err.message)
+    }
   }
 
   const filtered = clientes.filter(c =>
@@ -207,16 +209,7 @@ export default function Clientes({
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <h2 className="section-title">Clientes</h2>
-            {!error && !loading && (
-              <span className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-950/30 border border-emerald-900/40 rounded-full px-2 py-0.5">
-                <Cloud size={11} /> Railway
-              </span>
-            )}
-            {error && (
-              <span className="flex items-center gap-1 text-xs text-amber-400 bg-amber-950/30 border border-amber-900/40 rounded-full px-2 py-0.5">
-                <CloudOff size={11} /> Offline
-              </span>
-            )}
+            {!loading && <SyncStatus error={error} syncing={syncing} />}
           </div>
           <p className="text-sm text-obsidian-500 mt-0.5">
             {loading ? 'Cargando…' : `${clientes.length} registrado${clientes.length !== 1 ? 's' : ''}`}
@@ -236,10 +229,7 @@ export default function Clientes({
       </div>
 
       {(error || actionError) && (
-        <div className="flex items-center gap-2 text-sm text-amber-400 bg-amber-950/20 border border-amber-900/30 rounded-lg px-4 py-3">
-          <CloudOff size={15} />
-          <span>{actionError || error}</span>
-        </div>
+        <ErrorBanner message={actionError || error} onRetry={error ? reload : null} />
       )}
 
       {showForm && (
@@ -258,10 +248,7 @@ export default function Clientes({
       )}
 
       {loading ? (
-        <div className="card p-12 text-center">
-          <RefreshCw size={32} className="mx-auto mb-4 text-obsidian-600 animate-spin" />
-          <p className="text-obsidian-400 text-sm">Conectando con el servidor…</p>
-        </div>
+        <LoadingCard />
       ) : filtered.length === 0 ? (
         <div className="card p-12 text-center">
           <User size={40} className="mx-auto mb-4 text-obsidian-700" />

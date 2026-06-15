@@ -2,6 +2,9 @@ import express from 'express'
 import cors from 'cors'
 import { initDb } from './db.js'
 import clientesRouter from './routes/clientes.js'
+import perfumesRouter from './routes/perfumes.js'
+import ventasRouter from './routes/ventas.js'
+import seguimientosRouter from './routes/seguimientos.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -28,6 +31,9 @@ app.get('/api/health', (_req, res) => {
 })
 
 app.use('/api/clientes', clientesRouter)
+app.use('/api/perfumes', perfumesRouter)
+app.use('/api/ventas', ventasRouter)
+app.use('/api/seguimientos', seguimientosRouter)
 
 async function start() {
   if (!process.env.DATABASE_URL) {

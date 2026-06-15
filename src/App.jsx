@@ -1,8 +1,13 @@
 import React, { useState } from 'react'
 import { LayoutDashboard, Package, Users, ShoppingBag, MessageCircle, AlertTriangle, Database } from 'lucide-react'
-import { useLocalStorage } from './hooks/useLocalStorage'
 import { useClientes } from './hooks/useClientes'
+import { usePerfumes } from './hooks/usePerfumes'
+import { useVentas } from './hooks/useVentas'
+import { useSeguimientos } from './hooks/useSeguimientos'
 import { bulkCreateClientes } from './api/clientes'
+import { bulkCreatePerfumes } from './api/perfumes'
+import { bulkCreateVentas } from './api/ventas'
+import { bulkCreateSeguimientos } from './api/seguimientos'
 import Dashboard from './components/Dashboard'
 import Inventario from './components/Inventario'
 import Clientes from './components/Clientes'
@@ -21,27 +26,29 @@ const TABS = [
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [showBackup, setShowBackup] = useState(false)
-  const [perfumes,     setPerfumes]     = useLocalStorage('esc_perfumes',     [])
-  const {
-    clientes,
-    loading: clientesLoading,
-    error: clientesError,
-    syncing: clientesSyncing,
-    reload: reloadClientes,
-    addCliente,
-    editCliente,
-    removeCliente,
-  } = useClientes()
-  const [ventas,       setVentas]       = useLocalStorage('esc_ventas',       [])
-  const [seguimientos, setSeguimientos] = useLocalStorage('esc_seguimientos', [])
 
-  const handleImportBackup = (data) => {
-    if (data.esc_perfumes)     setPerfumes(data.esc_perfumes)
-    if (data.esc_ventas)       setVentas(data.esc_ventas)
-    if (data.esc_seguimientos) setSeguimientos(data.esc_seguimientos)
-    if (data.esc_clientes?.length) {
-      bulkCreateClientes(data.esc_clientes).then(() => reloadClientes()).catch(() => {})
-    }
+  const clientesHook = useClientes()
+  const perfumesHook = usePerfumes()
+  const ventasHook = useVentas()
+  const seguimientosHook = useSeguimientos()
+
+  const { clientes } = clientesHook
+  const { perfumes } = perfumesHook
+  const { ventas } = ventasHook
+  const { seguimientos } = seguimientosHook
+
+  const handleImportBackup = async (data) => {
+    const tasks = []
+    if (data.esc_clientes?.length) tasks.push(bulkCreateClientes(data.esc_clientes).then(() => clientesHook.reload()))
+    if (data.esc_perfumes?.length) tasks.push(bulkCreatePerfumes(data.esc_perfumes).then(() => perfumesHook.reload()))
+    if (data.esc_ventas?.length) tasks.push(bulkCreateVentas(data.esc_ventas).then(() => ventasHook.reload()))
+    if (data.esc_seguimientos?.length) tasks.push(bulkCreateSeguimientos(data.esc_seguimientos).then(() => seguimientosHook.reload()))
+    await Promise.allSettled(tasks)
+  }
+
+  const handleVenta = async (data) => {
+    await ventasHook.addVenta(data)
+    await perfumesHook.reload()
   }
 
   const pendientesCount  = ventas.filter(v => v.estadoPago === 'pendiente').length
@@ -127,7 +134,11 @@ export default function App() {
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8">
         {showBackup && (
           <div className="mb-6">
-            <DataBackup onImport={handleImportBackup} onClose={() => setShowBackup(false)} clientes={clientes} />
+            <DataBackup
+              onImport={handleImportBackup}
+              onClose={() => setShowBackup(false)}
+              data={{ clientes, perfumes, ventas, seguimientos }}
+            />
           </div>
         )}
 
@@ -135,35 +146,29 @@ export default function App() {
           <Dashboard perfumes={perfumes} ventas={ventas} clientes={clientes} />
         )}
         {activeTab === 'inventario' && (
-          <Inventario perfumes={perfumes} setPerfumes={setPerfumes} />
+          <Inventario {...perfumesHook} />
         )}
         {activeTab === 'clientes' && (
           <Clientes
-            clientes={clientes}
-            loading={clientesLoading}
-            error={clientesError}
-            syncing={clientesSyncing}
-            reload={reloadClientes}
-            addCliente={addCliente}
-            editCliente={editCliente}
-            removeCliente={removeCliente}
+            {...clientesHook}
             ventas={ventas}
-            setVentas={setVentas}
+            togglePago={ventasHook.togglePago}
           />
         )}
         {activeTab === 'ventas' && (
           <Ventas
-            ventas={ventas} setVentas={setVentas}
-            perfumes={perfumes} setPerfumes={setPerfumes}
+            {...ventasHook}
+            perfumes={perfumes}
             clientes={clientes}
+            onVenta={handleVenta}
+            reloadPerfumes={perfumesHook.reload}
           />
         )}
         {activeTab === 'seguimiento' && (
           <Seguimiento
+            {...seguimientosHook}
             clientes={clientes}
             ventas={ventas}
-            seguimientos={seguimientos}
-            setSeguimientos={setSeguimientos}
           />
         )}
       </main>

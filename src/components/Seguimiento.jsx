@@ -4,7 +4,8 @@ import {
   ChevronDown, ChevronUp, Bell, Send, Trash2, Star,
   AlertTriangle, Filter, Phone
 } from 'lucide-react'
-import { generateId, formatCurrency, formatDate } from '../utils/helpers'
+import { formatCurrency, formatDate } from '../utils/helpers'
+import { SyncStatus, LoadingCard, ErrorBanner } from './SyncStatus'
 
 // ── Plantillas de mensajes ──────────────────────────────────────────────
 const PLANTILLAS = [
@@ -374,39 +375,59 @@ function SeguimientoCard({ seg, ventas, onDelete, onMarcarEnviado, onToggleEstad
   )
 }
 
-export default function Seguimiento({ clientes, ventas, seguimientos, setSeguimientos }) {
+export default function Seguimiento({
+  seguimientos, loading, error, syncing, reload,
+  addSeguimiento, removeSeguimiento, marcarEnviado, toggleEstado,
+  clientes, ventas,
+}) {
   const [showForm, setShowForm] = useState(false)
   const [filtro, setFiltro] = useState('pendiente')
   const [search, setSearch] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [actionError, setActionError] = useState(null)
 
-  const handleCrear = (data) => {
-    setSeguimientos(prev => [...prev, { id: generateId(), creadoEn: new Date().toISOString(), ...data }])
-    setShowForm(false)
-  }
-
-  const handleDelete = (id) => {
-    if (confirm('¿Eliminar este seguimiento?')) {
-      setSeguimientos(prev => prev.filter(s => s.id !== id))
+  const handleCrear = async (data) => {
+    setSaving(true)
+    setActionError(null)
+    try {
+      await addSeguimiento(data)
+      setShowForm(false)
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setSaving(false)
     }
   }
 
-  const handleMarcarEnviado = (id, mensaje) => {
-    setSeguimientos(prev => prev.map(s =>
-      s.id === id
-        ? {
-            ...s,
-            historial: [...(s.historial || []), { fecha: new Date().toISOString(), mensaje }],
-          }
-        : s
-    ))
+  const handleDelete = async (id) => {
+    if (!confirm('¿Eliminar este seguimiento?')) return
+    setSaving(true)
+    setActionError(null)
+    try {
+      await removeSeguimiento(id)
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleToggleEstado = (id) => {
-    setSeguimientos(prev => prev.map(s =>
-      s.id === id
-        ? { ...s, estado: s.estado === 'completado' ? 'pendiente' : 'completado' }
-        : s
-    ))
+  const handleMarcarEnviado = async (id, mensaje) => {
+    setActionError(null)
+    try {
+      await marcarEnviado(id, mensaje)
+    } catch (err) {
+      setActionError(err.message)
+    }
+  }
+
+  const handleToggleEstado = async (id) => {
+    setActionError(null)
+    try {
+      await toggleEstado(id)
+    } catch (err) {
+      setActionError(err.message)
+    }
   }
 
   const filtered = seguimientos
@@ -447,17 +468,26 @@ export default function Seguimiento({ clientes, ventas, seguimientos, setSeguimi
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex-1">
-          <h2 className="section-title">Seguimiento WhatsApp</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="section-title">Seguimiento WhatsApp</h2>
+            {!loading && <SyncStatus error={error} syncing={syncing} />}
+          </div>
           <p className="text-sm text-obsidian-500 mt-0.5">
-            {pendientesCount} pendiente{pendientesCount !== 1 ? 's' : ''}
-            {vencidosCount > 0 && <span className="text-red-400"> · {vencidosCount} vencido{vencidosCount !== 1 ? 's' : ''}</span>}
-            {hoyCount > 0 && <span className="text-amber-400"> · {hoyCount} para hoy</span>}
+            {loading ? 'Cargando…' : (
+              <>
+                {pendientesCount} pendiente{pendientesCount !== 1 ? 's' : ''}
+                {vencidosCount > 0 && <span className="text-red-400"> · {vencidosCount} vencido{vencidosCount !== 1 ? 's' : ''}</span>}
+                {hoyCount > 0 && <span className="text-amber-400"> · {hoyCount} para hoy</span>}
+              </>
+            )}
           </p>
         </div>
-        <button className="btn-gold flex items-center gap-2" onClick={() => setShowForm(v => !v)}>
+        <button className="btn-gold flex items-center gap-2" onClick={() => setShowForm(v => !v)} disabled={loading}>
           <Plus size={15} /> Nuevo Seguimiento
         </button>
       </div>
+
+      <ErrorBanner message={actionError || error} onRetry={error ? reload : null} />
 
       {/* Alerta de clientes sin teléfono */}
       {clientes.some(c => !c.telefono) && (
@@ -537,7 +567,9 @@ export default function Seguimiento({ clientes, ventas, seguimientos, setSeguimi
       )}
 
       {/* Lista */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <LoadingCard />
+      ) : filtered.length === 0 ? (
         <div className="card p-12 text-center">
           <MessageCircle size={40} className="mx-auto mb-4 text-obsidian-700" />
           <p className="text-obsidian-400 font-display text-xl font-light">

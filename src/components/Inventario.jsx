@@ -3,7 +3,9 @@ import {
   Plus, Upload, AlertTriangle, Trash2, Edit3, X, Check,
   ChevronDown, ChevronUp, FileText, Package
 } from 'lucide-react'
-import { calcPrecioVenta, calcGananciaNeta, formatCurrency, generateId, parseBulkText } from '../utils/helpers'
+import { calcPrecioVenta, calcGananciaNeta, formatCurrency, parseBulkText } from '../utils/helpers'
+import { bulkCreatePerfumes } from '../api/perfumes'
+import { SyncStatus, LoadingCard, ErrorBanner } from './SyncStatus'
 
 const EMPTY_FORM = {
   nombre: '', stock: '', costoBase: '', comision: '', porcentajeGanancia: '',
@@ -334,29 +336,67 @@ function PerfumeRow({ perfume, onEdit, onDelete }) {
   )
 }
 
-export default function Inventario({ perfumes, setPerfumes }) {
+export default function Inventario({
+  perfumes, loading, error, syncing, reload,
+  addPerfume, editPerfume, removePerfume,
+}) {
   const [showForm, setShowForm] = useState(false)
   const [showBulk, setShowBulk] = useState(false)
   const [search, setSearch] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [actionError, setActionError] = useState(null)
 
-  const handleAdd = (data) => {
-    setPerfumes(prev => [...prev, { id: generateId(), ...data }])
-    setShowForm(false)
-  }
-
-  const handleEdit = (id, data) => {
-    setPerfumes(prev => prev.map(p => p.id === id ? { ...p, ...data } : p))
-  }
-
-  const handleDelete = (id) => {
-    if (confirm('¿Eliminar este perfume del inventario?')) {
-      setPerfumes(prev => prev.filter(p => p.id !== id))
+  const handleAdd = async (data) => {
+    setSaving(true)
+    setActionError(null)
+    try {
+      await addPerfume(data)
+      setShowForm(false)
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setSaving(false)
     }
   }
 
-  const handleBulkImport = (items) => {
-    const newPerfumes = items.map(item => ({ id: generateId(), ...item }))
-    setPerfumes(prev => [...prev, ...newPerfumes])
+  const handleEdit = async (id, data) => {
+    setSaving(true)
+    setActionError(null)
+    try {
+      await editPerfume(id, data)
+    } catch (err) {
+      setActionError(err.message)
+      throw err
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async (id) => {
+    if (!confirm('¿Eliminar este perfume del inventario?')) return
+    setSaving(true)
+    setActionError(null)
+    try {
+      await removePerfume(id)
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleBulkImport = async (items) => {
+    setSaving(true)
+    setActionError(null)
+    try {
+      await bulkCreatePerfumes(items)
+      await reload()
+      setShowBulk(false)
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const filtered = perfumes.filter(p =>
@@ -370,24 +410,38 @@ export default function Inventario({ perfumes, setPerfumes }) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex-1">
-          <h2 className="section-title">Inventario</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="section-title">Inventario</h2>
+            {!loading && <SyncStatus error={error} syncing={syncing} />}
+          </div>
           <p className="text-sm text-obsidian-500 mt-0.5">
-            {perfumes.length} perfume{perfumes.length !== 1 ? 's' : ''} ·{' '}
-            {perfumes.reduce((a, p) => a + p.stock, 0)} unidades en stock
-            {lowStockCount > 0 && (
-              <span className="ml-2 text-red-400">· {lowStockCount} con stock crítico</span>
+            {loading ? 'Cargando…' : (
+              <>
+                {perfumes.length} perfume{perfumes.length !== 1 ? 's' : ''} ·{' '}
+                {perfumes.reduce((a, p) => a + p.stock, 0)} unidades en stock
+                {lowStockCount > 0 && (
+                  <span className="ml-2 text-red-400">· {lowStockCount} con stock crítico</span>
+                )}
+              </>
             )}
           </p>
         </div>
         <div className="flex gap-2">
-          <button className="btn-ghost flex items-center gap-2" onClick={() => { setShowBulk(true); setShowForm(false) }}>
+          {error && (
+            <button className="btn-ghost flex items-center gap-2" onClick={reload}>
+              Reintentar
+            </button>
+          )}
+          <button className="btn-ghost flex items-center gap-2" onClick={() => { setShowBulk(true); setShowForm(false) }} disabled={loading}>
             <Upload size={15} /> Carga masiva
           </button>
-          <button className="btn-gold flex items-center gap-2" onClick={() => { setShowForm(true); setShowBulk(false) }}>
+          <button className="btn-gold flex items-center gap-2" onClick={() => { setShowForm(true); setShowBulk(false) }} disabled={loading}>
             <Plus size={15} /> Agregar
           </button>
         </div>
       </div>
+
+      <ErrorBanner message={actionError || error} onRetry={error ? reload : null} />
 
       {/* Forms */}
       {showBulk && (
@@ -413,7 +467,9 @@ export default function Inventario({ perfumes, setPerfumes }) {
       )}
 
       {/* List */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <LoadingCard />
+      ) : filtered.length === 0 ? (
         <div className="card p-12 text-center">
           <Package size={40} className="mx-auto mb-4 text-obsidian-700" />
           <p className="text-obsidian-400 font-display text-xl font-light">

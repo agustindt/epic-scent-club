@@ -1,33 +1,19 @@
 import React, { useRef, useState } from 'react'
 import { Download, Upload, Database, Check, AlertTriangle, X } from 'lucide-react'
 
-const STORAGE_KEYS = [
-  'esc_perfumes',
-  'esc_clientes',
-  'esc_ventas',
-  'esc_seguimientos',
-]
-
-export default function DataBackup({ onImport, onClose, clientes = [] }) {
+export default function DataBackup({ onImport, onClose, data = {} }) {
   const fileRef = useRef()
   const [status, setStatus] = useState(null)
 
   const handleExport = () => {
-    const data = {}
-    STORAGE_KEYS.forEach(key => {
-      if (key === 'esc_clientes') {
-        data[key] = clientes
-        return
-      }
-      try {
-        const raw = localStorage.getItem(key)
-        data[key] = raw ? JSON.parse(raw) : []
-      } catch {
-        data[key] = []
-      }
-    })
+    const exportData = {
+      esc_clientes: data.clientes || [],
+      esc_perfumes: data.perfumes || [],
+      esc_ventas: data.ventas || [],
+      esc_seguimientos: data.seguimientos || [],
+    }
 
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -40,12 +26,12 @@ export default function DataBackup({ onImport, onClose, clientes = [] }) {
   const handleImport = (file) => {
     if (!file) return
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        const data = JSON.parse(e.target.result)
+        const parsed = JSON.parse(e.target.result)
         const imported = {}
-        STORAGE_KEYS.forEach(key => {
-          if (Array.isArray(data[key])) imported[key] = data[key]
+        ;['esc_clientes', 'esc_perfumes', 'esc_ventas', 'esc_seguimientos'].forEach(key => {
+          if (Array.isArray(parsed[key])) imported[key] = parsed[key]
         })
 
         if (Object.keys(imported).length === 0) {
@@ -53,9 +39,9 @@ export default function DataBackup({ onImport, onClose, clientes = [] }) {
           return
         }
 
-        if (!confirm('¿Importar respaldo? Esto reemplazará todos los datos actuales.')) return
+        if (!confirm('¿Importar respaldo? Esto agregará los datos al servidor.')) return
 
-        onImport(imported)
+        await onImport(imported)
         setStatus({ type: 'success', message: 'Datos importados correctamente.' })
       } catch {
         setStatus({ type: 'error', message: 'Archivo JSON inválido.' })
@@ -79,8 +65,7 @@ export default function DataBackup({ onImport, onClose, clientes = [] }) {
       </div>
 
       <p className="text-sm text-obsidian-400">
-        Exportá o importá todos tus datos (inventario, clientes, ventas y seguimientos).
-        Ideal para respaldar o migrar entre dispositivos.
+        Exportá o importá todos tus datos desde Railway (inventario, clientes, ventas y seguimientos).
       </p>
 
       {status && (

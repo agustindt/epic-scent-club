@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Plus, X, Check, ShoppingBag, AlertTriangle, Trash2, Filter } from 'lucide-react'
-import { generateId, formatCurrency, formatDate, calcPrecioVenta, calcGananciaNeta } from '../utils/helpers'
+import { formatCurrency, formatDate, calcPrecioVenta, calcGananciaNeta } from '../utils/helpers'
+import { SyncStatus, LoadingCard, ErrorBanner } from './SyncStatus'
 
 const METODOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta de Débito', 'Tarjeta de Crédito', 'Mercado Pago', 'Otro']
 
@@ -157,30 +158,50 @@ function VentaForm({ perfumes, clientes, onSave, onCancel }) {
   )
 }
 
-export default function Ventas({ ventas, setVentas, perfumes, setPerfumes, clientes }) {
+export default function Ventas({
+  ventas, loading, error, syncing, reload,
+  removeVenta, togglePago,
+  perfumes, clientes, onVenta,
+}) {
   const [showForm, setShowForm] = useState(false)
   const [filterEstado, setFilterEstado] = useState('todos')
   const [search, setSearch] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [actionError, setActionError] = useState(null)
 
-  const handleVenta = (data) => {
-    // Registrar venta
-    setVentas(prev => [...prev, { id: generateId(), ...data }])
-    // Descontar stock
-    setPerfumes(prev => prev.map(p =>
-      p.id === data.perfumeId ? { ...p, stock: Math.max(0, p.stock - 1) } : p
-    ))
-    setShowForm(false)
+  const handleVenta = async (data) => {
+    setSaving(true)
+    setActionError(null)
+    try {
+      await onVenta(data)
+      setShowForm(false)
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleDeleteVenta = (id) => {
+  const handleDeleteVenta = async (id) => {
     if (!confirm('¿Eliminar esta venta? El stock NO se restaurará automáticamente.')) return
-    setVentas(prev => prev.filter(v => v.id !== id))
+    setSaving(true)
+    setActionError(null)
+    try {
+      await removeVenta(id)
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleTogglePago = (id) => {
-    setVentas(prev => prev.map(v =>
-      v.id === id ? { ...v, estadoPago: v.estadoPago === 'pagado' ? 'pendiente' : 'pagado' } : v
-    ))
+  const handleTogglePago = async (id) => {
+    setActionError(null)
+    try {
+      await togglePago(id)
+    } catch (err) {
+      setActionError(err.message)
+    }
   }
 
   const filtered = ventas
@@ -199,16 +220,25 @@ export default function Ventas({ ventas, setVentas, perfumes, setPerfumes, clien
     <div className="space-y-6 fade-up">
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex-1">
-          <h2 className="section-title">Ventas</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="section-title">Ventas</h2>
+            {!loading && <SyncStatus error={error} syncing={syncing} />}
+          </div>
           <p className="text-sm text-obsidian-500 mt-0.5">
-            {ventas.length} transacción{ventas.length !== 1 ? 'es' : ''} ·{' '}
-            {ventas.filter(v => v.estadoPago === 'pendiente').length} pendiente{ventas.filter(v => v.estadoPago === 'pendiente').length !== 1 ? 's' : ''}
+            {loading ? 'Cargando…' : (
+              <>
+                {ventas.length} transacción{ventas.length !== 1 ? 'es' : ''} ·{' '}
+                {ventas.filter(v => v.estadoPago === 'pendiente').length} pendiente{ventas.filter(v => v.estadoPago === 'pendiente').length !== 1 ? 's' : ''}
+              </>
+            )}
           </p>
         </div>
-        <button className="btn-gold flex items-center gap-2" onClick={() => setShowForm(v => !v)}>
+        <button className="btn-gold flex items-center gap-2" onClick={() => setShowForm(v => !v)} disabled={loading}>
           <Plus size={15} /> Nueva Venta
         </button>
       </div>
+
+      <ErrorBanner message={actionError || error} onRetry={error ? reload : null} />
 
       {showForm && (
         <div className="card p-5 fade-up">
@@ -249,7 +279,9 @@ export default function Ventas({ ventas, setVentas, perfumes, setPerfumes, clien
       )}
 
       {/* List */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <LoadingCard />
+      ) : filtered.length === 0 ? (
         <div className="card p-12 text-center">
           <ShoppingBag size={40} className="mx-auto mb-4 text-obsidian-700" />
           <p className="text-obsidian-400 font-display text-xl font-light">
