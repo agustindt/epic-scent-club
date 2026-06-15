@@ -34,9 +34,12 @@ export async function initDb() {
       costo_base NUMERIC(12,2) NOT NULL DEFAULT 0,
       comision NUMERIC(12,2) NOT NULL DEFAULT 0,
       porcentaje_ganancia NUMERIC(8,2) NOT NULL DEFAULT 0,
+      imagen TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE perfumes ADD COLUMN IF NOT EXISTS imagen TEXT NOT NULL DEFAULT '';
 
     CREATE TABLE IF NOT EXISTS ventas (
       id TEXT PRIMARY KEY,

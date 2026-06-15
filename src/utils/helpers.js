@@ -28,6 +28,11 @@ export function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
 }
 
+export function buildWhatsAppLink(telefono, mensaje) {
+  const num = telefono.replace(/\D/g, '')
+  return `https://wa.me/${num}?text=${encodeURIComponent(mensaje)}`
+}
+
 // Simple CSV/text parser for bulk import
 // Expected format (one per line): Nombre, Stock, CostoBase, Comision, %Ganancia
 export function parseBulkText(text) {

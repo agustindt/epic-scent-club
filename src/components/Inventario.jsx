@@ -8,7 +8,7 @@ import { bulkCreatePerfumes } from '../api/perfumes'
 import { SyncStatus, LoadingCard, ErrorBanner } from './SyncStatus'
 
 const EMPTY_FORM = {
-  nombre: '', stock: '', costoBase: '', comision: '', porcentajeGanancia: '',
+  nombre: '', stock: '', costoBase: '', comision: '', porcentajeGanancia: '', imagen: '',
 }
 
 function PerfumeForm({ initial = EMPTY_FORM, onSave, onCancel, title = 'Nuevo Perfume' }) {
@@ -28,6 +28,7 @@ function PerfumeForm({ initial = EMPTY_FORM, onSave, onCancel, title = 'Nuevo Pe
       costoBase: parseFloat(form.costoBase) || 0,
       comision: parseFloat(form.comision) || 0,
       porcentajeGanancia: parseFloat(form.porcentajeGanancia) || 0,
+      imagen: form.imagen.trim(),
     })
   }
 
@@ -86,6 +87,17 @@ function PerfumeForm({ initial = EMPTY_FORM, onSave, onCancel, title = 'Nuevo Pe
             type="number" min="0" step="0.01" placeholder="0"
             value={form.porcentajeGanancia}
             onChange={e => set('porcentajeGanancia', e.target.value)}
+          />
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className="label">URL de imagen (opcional, para catálogo público)</label>
+          <input
+            className="input-field"
+            type="url"
+            placeholder="https://ejemplo.com/foto.jpg"
+            value={form.imagen}
+            onChange={e => set('imagen', e.target.value)}
           />
         </div>
       </div>
@@ -260,7 +272,7 @@ function PerfumeRow({ perfume, onEdit, onDelete }) {
     return (
       <div className="card p-5 fade-up">
         <PerfumeForm
-          initial={{ ...perfume, stock: String(perfume.stock), costoBase: String(perfume.costoBase), comision: String(perfume.comision), porcentajeGanancia: String(perfume.porcentajeGanancia) }}
+          initial={{ ...perfume, stock: String(perfume.stock), costoBase: String(perfume.costoBase), comision: String(perfume.comision), porcentajeGanancia: String(perfume.porcentajeGanancia), imagen: perfume.imagen || '' }}
           title="Editar Perfume"
           onSave={(data) => { onEdit(perfume.id, data); setEditing(false) }}
           onCancel={() => setEditing(false)}
