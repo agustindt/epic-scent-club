@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 function readLegacy(key) {
   try {
@@ -8,6 +8,8 @@ function readLegacy(key) {
     return []
   }
 }
+
+const defaultSort = () => 0
 
 export function useResource({
   fetchFn,
@@ -24,7 +26,10 @@ export function useResource({
   const [error, setError] = useState(null)
   const [syncing, setSyncing] = useState(false)
 
-  const sort = sortFn || ((a, b) => 0)
+  const sortRef = useRef(sortFn || defaultSort)
+  sortRef.current = sortFn || defaultSort
+
+  const sortItems = useCallback((list) => [...list].sort(sortRef.current), [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -43,7 +48,7 @@ export function useResource({
         setSyncing(false)
       }
 
-      setItems([...data].sort(sort))
+      setItems(sortItems(data))
     } catch (err) {
       setError(err.message || 'No se pudieron cargar los datos')
       const legacy = readLegacy(legacyKey)
@@ -51,21 +56,21 @@ export function useResource({
     } finally {
       setLoading(false)
     }
-  }, [fetchFn, bulkCreateFn, legacyKey, migratedKey, sortFn])
+  }, [fetchFn, bulkCreateFn, legacyKey, migratedKey, sortItems])
 
   useEffect(() => { load() }, [load])
 
   const add = useCallback(async (data) => {
     const created = await createFn(data)
-    setItems(prev => [...prev, created].sort(sort))
+    setItems(prev => sortItems([...prev, created]))
     return created
-  }, [createFn, sortFn])
+  }, [createFn, sortItems])
 
   const edit = useCallback(async (id, data) => {
     const updated = await updateFn(id, data)
-    setItems(prev => prev.map(item => item.id === id ? updated : item).sort(sort))
+    setItems(prev => sortItems(prev.map(item => item.id === id ? updated : item)))
     return updated
-  }, [updateFn, sortFn])
+  }, [updateFn, sortItems])
 
   const remove = useCallback(async (id) => {
     await deleteFn(id)
@@ -73,8 +78,8 @@ export function useResource({
   }, [deleteFn])
 
   const replace = useCallback((next) => {
-    setItems([...next].sort(sort))
-  }, [sortFn])
+    setItems(sortItems(next))
+  }, [sortItems])
 
   return { items, loading, error, syncing, reload: load, add, edit, remove, replace }
 }
